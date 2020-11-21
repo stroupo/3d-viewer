@@ -1,0 +1,13 @@
+*
+!*/
+
+!*.hpp
+!*.cpp
+
+!buildfile
+
+!README.md
+
+!docs/**
+
+!.gitignore
