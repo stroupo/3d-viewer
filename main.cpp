@@ -1,18 +1,21 @@
+#include <cmath>
+#include <iomanip>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+//
 #include <glbinding/gl/gl.h>
 #include <glbinding/glbinding.h>
 //
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 //
-#include <stdio.h>
-#include <stdlib.h>
-
 #include <glm/glm.hpp>
 //
 #include <glm/ext.hpp>
 
+using namespace std;
 using namespace gl;
-// using namespace glm;
 
 static const struct {
   float x, y;
@@ -22,7 +25,7 @@ static const struct {
                  {0.f, 0.6f, 0.f, 0.f, 1.f}};
 
 static const char* vertex_shader_text =
-    "#version 110\n"
+    "#version 330\n"
     "uniform mat4 MVP;\n"
     "attribute vec3 vCol;\n"
     "attribute vec2 vPos;\n"
@@ -34,68 +37,58 @@ static const char* vertex_shader_text =
     "}\n";
 
 static const char* fragment_shader_text =
-    "#version 110\n"
+    "#version 330\n"
     "varying vec3 color;\n"
     "void main()\n"
     "{\n"
     "    gl_FragColor = vec4(color, 1.0);\n"
     "}\n";
 
-static void error_callback(int error, const char* description) {
-  fprintf(stderr, "Error: %s\n", description);
-}
-
-static void key_callback(GLFWwindow* window, int key, int scancode, int action,
-                         int mods) {
-  if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-    glfwSetWindowShouldClose(window, GLFW_TRUE);
-}
-
 int main(void) {
-  GLFWwindow* window;
+  glfwSetErrorCallback([](int error, const char* description) {
+    throw runtime_error{"GLFW Error " + to_string(error) + ": " + description};
+  });
+  glfwInit();
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_SAMPLES, 4);
 
-  GLuint vertex_buffer, vertex_shader, fragment_shader, program;
-  GLint mvp_location, vpos_location, vcol_location;
-
-  glfwSetErrorCallback(error_callback);
-
-  if (!glfwInit()) exit(EXIT_FAILURE);
-
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-
-  window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
-  if (!window) {
-    glfwTerminate();
-    exit(EXIT_FAILURE);
-  }
-
-  glfwSetKeyCallback(window, key_callback);
-
+  auto window = glfwCreateWindow(640, 480, "Simple example", nullptr, nullptr);
   glfwMakeContextCurrent(window);
-
   glbinding::initialize(glfwGetProcAddress);
 
+  glfwSetKeyCallback(window, [](GLFWwindow* window, int key, int scancode,
+                                int action, int mods) {
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+  });
+
+  GLuint vertex_array;
+  glGenVertexArrays(1, &vertex_array);
+  glBindVertexArray(vertex_array);
+
+  GLuint vertex_buffer;
   glGenBuffers(1, &vertex_buffer);
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-  vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+  auto vertex_shader = glCreateShader(GL_VERTEX_SHADER);
   glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
   glCompileShader(vertex_shader);
 
-  fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+  auto fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
   glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
   glCompileShader(fragment_shader);
 
-  program = glCreateProgram();
+  auto program = glCreateProgram();
   glAttachShader(program, vertex_shader);
   glAttachShader(program, fragment_shader);
   glLinkProgram(program);
 
-  mvp_location = glGetUniformLocation(program, "MVP");
-  vpos_location = glGetAttribLocation(program, "vPos");
-  vcol_location = glGetAttribLocation(program, "vCol");
+  auto mvp_location = glGetUniformLocation(program, "MVP");
+  auto vpos_location = glGetAttribLocation(program, "vPos");
+  auto vcol_location = glGetAttribLocation(program, "vCol");
 
   glEnableVertexAttribArray(vpos_location);
   glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
@@ -105,20 +98,18 @@ int main(void) {
                         sizeof(vertices[0]), (void*)(sizeof(float) * 2));
 
   while (!glfwWindowShouldClose(window)) {
-    float ratio;
     int width, height;
-    // mat4x4 m, p, mvp;
-
     glfwGetFramebufferSize(window, &width, &height);
-    ratio = width / (float)height;
+    auto ratio = width / (float)height;
 
     glViewport(0, 0, width, height);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glm::mat4x4 m{1.0f};
-    m = rotate(m, (float)glfwGetTime(), glm::vec3(1, 1, 1));
+    m = rotate(m, (float)glfwGetTime(),
+               glm::vec3(1 / sqrt(3), 1 / sqrt(3), 1 / sqrt(3)));
     glm::mat4 v = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5));
-    glm::mat4 p = glm::perspective(45.0f, 4.0f / 3.0f, 0.1f, 100.f);
+    glm::mat4 p = glm::perspective(45.0f, ratio, 0.1f, 100.f);
     glm::mat4 mvp = p * v * m;
 
     glUseProgram(program);
@@ -130,7 +121,5 @@ int main(void) {
   }
 
   glfwDestroyWindow(window);
-
   glfwTerminate();
-  exit(EXIT_SUCCESS);
 }
