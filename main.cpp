@@ -44,6 +44,9 @@ static const char* fragment_shader_text =
     "    gl_FragColor = vec4(color, 1.0);\n"
     "}\n";
 
+glm::vec3 up{0, 1, 0};
+glm::vec3 origin{0, 0, 0};
+float fov = 45.0f;
 float radius = 5.0f;
 float altitude = 0.0f;
 float azimuth = 0.0f;
@@ -108,20 +111,6 @@ int main(void) {
   glm::vec2 mouse_pos{};
 
   while (!glfwWindowShouldClose(window)) {
-    old_mouse_pos = mouse_pos;
-    double xpos, ypos;
-    glfwGetCursorPos(window, &xpos, &ypos);
-    mouse_pos = glm::vec2{xpos, ypos};
-
-    int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
-    if (state == GLFW_PRESS) {
-      const auto mouse_move = mouse_pos - old_mouse_pos;
-      altitude += mouse_move.y * 0.01;
-      azimuth += mouse_move.x * 0.01;
-      constexpr float bound = M_PI_2 - 1e-5f;
-      altitude = clamp(altitude, -bound, bound);
-    }
-
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     auto ratio = width / (float)height;
@@ -132,13 +121,38 @@ int main(void) {
     glm::vec3 camera{cos(altitude) * cos(azimuth), sin(altitude),
                      cos(altitude) * sin(azimuth)};
     camera *= radius;
-    const auto v = glm::lookAt(camera, {}, {0, 1, 0});
+    const auto v = glm::lookAt(camera + origin, origin, up);
+    const auto camera_right = normalize(cross(-camera, up));
+    const auto camera_up = normalize(cross(camera_right, -camera));
+    const float pixel_size = 2.0f * tan(0.5f * fov * M_PI / 180.0f) / height;
+
+    old_mouse_pos = mouse_pos;
+    double xpos, ypos;
+    glfwGetCursorPos(window, &xpos, &ypos);
+    mouse_pos = glm::vec2{xpos, ypos};
+    const auto mouse_move = mouse_pos - old_mouse_pos;
+
+    int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
+    if (state == GLFW_PRESS) {
+      altitude += mouse_move.y * 0.01;
+      azimuth += mouse_move.x * 0.01;
+      constexpr float bound = M_PI_2 - 1e-5f;
+      // if (altitude >= bound) altitude = bound;
+      // if (altitude <= -bound) altitude = -bound;
+      altitude = clamp(altitude, -bound, bound);
+    }
+    state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
+    if (state == GLFW_PRESS) {
+      const auto scale = 1.3f * pixel_size * length(camera);
+      origin += -scale * mouse_move.x * camera_right +
+                scale * mouse_move.y * camera_up;
+    }
 
     glm::mat4x4 m{1.0f};
     m = rotate(m, (float)glfwGetTime(),
                glm::vec3(1 / sqrt(3), 1 / sqrt(3), 1 / sqrt(3)));
     // glm::mat4 v = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5));
-    glm::mat4 p = glm::perspective(45.0f, ratio, 0.1f, 100.f);
+    glm::mat4 p = glm::perspective(fov, ratio, 0.1f, 100.f);
     glm::mat4 mvp = p * v * m;
 
     glUseProgram(program);
