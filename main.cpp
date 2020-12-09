@@ -1,4 +1,6 @@
 #include <cmath>
+#include <cstdint>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
@@ -26,23 +28,29 @@ static const struct {
 
 static const char* vertex_shader_text =
     "#version 330\n"
-    "uniform mat4 MVP;\n"
-    "attribute vec3 vCol;\n"
-    "attribute vec2 vPos;\n"
-    "varying vec3 color;\n"
-    "void main()\n"
-    "{\n"
-    "    gl_Position = MVP * vec4(vPos, 0.0, 1.0);\n"
-    "    color = vCol;\n"
-    "}\n";
+    "uniform mat4 MVP;"
+    // "attribute vec3 vCol;"
+    // "attribute vec2 vPos;"
+    "attribute vec3 vPos;"
+    "attribute vec3 vNor;"
+    // "varying vec3 color;"
+    "varying vec3 normal;"
+    "void main()"
+    "{"
+    "  gl_Position = MVP * vec4(vPos, 1.0);"
+    // "  color = vCol;"
+    "  normal = vNor;"
+    "}";
 
 static const char* fragment_shader_text =
     "#version 330\n"
-    "varying vec3 color;\n"
-    "void main()\n"
-    "{\n"
-    "    gl_FragColor = vec4(color, 1.0);\n"
-    "}\n";
+    // "varying vec3 color;"
+    "varying vec3 normal;"
+    "void main()"
+    "{"
+    // "  gl_FragColor = vec4(color, 1.0);"
+    "  gl_FragColor = vec4(normal, 1.0);"
+    "}";
 
 glm::vec3 up{0, 1, 0};
 glm::vec3 origin{0, 0, 0};
@@ -51,7 +59,38 @@ float radius = 5.0f;
 float altitude = 0.0f;
 float azimuth = 0.0f;
 
-int main(void) {
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    cout << "usage:\n" << argv[0] << " <stl file>\n";
+    return -1;
+  }
+
+  fstream file{argv[1], ios::in};
+  // Ignore header.
+  file.ignore(80);
+  uint32_t stl_size;
+  file.read(reinterpret_cast<char*>(&stl_size), sizeof(uint32_t));
+
+  vector<glm::vec3> triangles(6 * stl_size);
+  for (size_t i = 0; i < stl_size; ++i) {
+    // file.ignore(12);
+    glm::vec3 normal;
+    file.read(reinterpret_cast<char*>(&normal), sizeof(glm::vec3));
+    for (size_t j = 0; j < 3; ++j) {
+      glm::vec3 vertex;
+      file.read(reinterpret_cast<char*>(&vertex), sizeof(glm::vec3));
+      triangles[2 * (3 * i + j) + 0] = vertex;
+      triangles[2 * (3 * i + j) + 1] = normal;
+    }
+    file.ignore(2);
+  }
+
+  // cout << "stl size = " << stl_size << '\n';
+  // for (size_t i = 0; i < 10; ++i)
+  //   cout << setw(10) << triangles[i].x << setw(10) << triangles[i].y <<
+  //   setw(10)
+  //        << triangles[i].z << '\n';
+
   glfwSetErrorCallback([](int error, const char* description) {
     throw runtime_error{"GLFW Error " + to_string(error) + ": " + description};
   });
@@ -81,7 +120,9 @@ int main(void) {
   GLuint vertex_buffer;
   glGenBuffers(1, &vertex_buffer);
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, triangles.size() * sizeof(glm::vec3),
+               triangles.data(), GL_STATIC_DRAW);
 
   auto vertex_shader = glCreateShader(GL_VERTEX_SHADER);
   glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
@@ -98,17 +139,27 @@ int main(void) {
 
   auto mvp_location = glGetUniformLocation(program, "MVP");
   auto vpos_location = glGetAttribLocation(program, "vPos");
-  auto vcol_location = glGetAttribLocation(program, "vCol");
+  auto vnor_location = glGetAttribLocation(program, "vNor");
 
+  // auto vcol_location = glGetAttribLocation(program, "vCol");
+
+  // glEnableVertexAttribArray(vpos_location);
+  // glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
+  //                       sizeof(vertices[0]), (void*)0);
+  // glEnableVertexAttribArray(vcol_location);
+  // glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE,
+  //                       sizeof(vertices[0]), (void*)(sizeof(float) * 2));
   glEnableVertexAttribArray(vpos_location);
-  glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
-                        sizeof(vertices[0]), (void*)0);
-  glEnableVertexAttribArray(vcol_location);
-  glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE,
-                        sizeof(vertices[0]), (void*)(sizeof(float) * 2));
+  glVertexAttribPointer(vpos_location, 3, GL_FLOAT, GL_FALSE,
+                        2 * sizeof(glm::vec3), (void*)0);
+  glEnableVertexAttribArray(vnor_location);
+  glVertexAttribPointer(vnor_location, 3, GL_FLOAT, GL_FALSE,
+                        2 * sizeof(glm::vec3), (void*)sizeof(glm::vec3));
 
   glm::vec2 old_mouse_pos{};
   glm::vec2 mouse_pos{};
+
+  glEnable(GL_DEPTH_TEST);
 
   while (!glfwWindowShouldClose(window)) {
     int width, height;
@@ -116,7 +167,7 @@ int main(void) {
     auto ratio = width / (float)height;
 
     glViewport(0, 0, width, height);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glm::vec3 camera{cos(altitude) * cos(azimuth), sin(altitude),
                      cos(altitude) * sin(azimuth)};
@@ -149,15 +200,16 @@ int main(void) {
     }
 
     glm::mat4x4 m{1.0f};
-    m = rotate(m, (float)glfwGetTime(),
-               glm::vec3(1 / sqrt(3), 1 / sqrt(3), 1 / sqrt(3)));
+    // m = rotate(m, (float)glfwGetTime(),
+    //            glm::vec3(1 / sqrt(3), 1 / sqrt(3), 1 / sqrt(3)));
     // glm::mat4 v = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5));
     glm::mat4 p = glm::perspective(fov, ratio, 0.1f, 100.f);
     glm::mat4 mvp = p * v * m;
 
     glUseProgram(program);
     glUniformMatrix4fv(mvp_location, 1, GL_FALSE, glm::value_ptr(mvp));
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    // glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawArrays(GL_TRIANGLES, 0, triangles.size() / 2);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
