@@ -56,13 +56,23 @@ static const char* fragment_shader_text =
     // "  gl_FragColor = vec4(normal, 1.0);"
     "  vec3 norm = normalize(normal);"
     "  vec3 light_dir = normalize(light_pos - frag_pos);"
-    "  float diffuse = max(dot(norm, light_dir), 0.0);"
-    "  vec3 diffuse_color = diffuse * vec3(1.0, 1.0, 1.0);"
-    "  vec3 ambient_color = vec3(1.0, 1.0, 1.0);"
-    "  float ambient_coeff = 0.5;"
+    // "  float diffuse = max(dot(norm, light_dir), 0.0);"
+    "  float diffuse = abs(dot(norm, light_dir));"
+    "  vec3 diffuse_color = diffuse * vec3(1.0, 0.8, 0.1);"
     "  float diffuse_coeff = 0.5;"
+
+    "  vec3 ambient_color = vec3(1.0, 0.8, 0.1);"
+    "  float ambient_coeff = 0.3;"
+
+    "  float specular_coeff = 0.2;"
+    "  vec3 view_dir = normalize(light_pos - frag_pos);"
+    "  vec3 reflect_dir = reflect(-light_dir, norm);"
+    // "  float specular = pow(max(dot(view_dir, reflect_dir), 0.0), 32);"
+    "  float specular = pow(abs(dot(view_dir, reflect_dir)), 6);"
+    "  vec3 specular_color = specular * vec3(1.0, 1.0, 1.0);"
+
     "  gl_FragColor = diffuse_coeff * vec4(diffuse_color, 1.0) + ambient_coeff "
-    "* vec4(ambient_color, 1.0);"
+    "* vec4(ambient_color, 1.0) + specular_coeff * vec4(specular_color, 1.0);"
     "}";
 
 glm::vec3 up{0, 0, 1};
