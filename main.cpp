@@ -98,6 +98,16 @@ int main(int argc, char* argv[]) {
     file.ignore(2);
   }
 
+  glm::vec3 aabb_min{triangles[0]};
+  glm::vec3 aabb_max{triangles[0]};
+  for (size_t i = 2; i < triangles.size(); i += 2) {
+    aabb_min = min(aabb_min, triangles[i]);
+    aabb_max = max(aabb_max, triangles[i]);
+  }
+  origin = 0.5f * (aabb_max + aabb_min);
+  radius = 0.5f * (aabb_max.y - aabb_min.y) +
+           0.5f * (aabb_max.z - aabb_min.z) / tan(0.5f * fov * M_PI / 180.0f);
+
   // cout << "stl size = " << stl_size << '\n';
   // for (size_t i = 0; i < 10; ++i)
   //   cout << setw(10) << triangles[i].x << setw(10) << triangles[i].y <<
