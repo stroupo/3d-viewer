@@ -105,8 +105,8 @@ int main(int argc, char* argv[]) {
     aabb_max = max(aabb_max, triangles[i]);
   }
   origin = 0.5f * (aabb_max + aabb_min);
-  radius = 0.5f * (aabb_max.y - aabb_min.y) +
-           0.5f * (aabb_max.z - aabb_min.z) / tan(0.5f * fov * M_PI / 180.0f);
+  radius = 0.5f * length(aabb_max - aabb_min) *
+           (1.0f / tan(0.5f * fov * M_PI / 180.0f));
 
   // cout << "stl size = " << stl_size << '\n';
   // for (size_t i = 0; i < 10; ++i)
