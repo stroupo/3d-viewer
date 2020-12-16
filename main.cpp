@@ -52,7 +52,7 @@ static const char* fragment_shader_text =
     "  gl_FragColor = vec4(normal, 1.0);"
     "}";
 
-glm::vec3 up{0, 1, 0};
+glm::vec3 up{0, 0, 1};
 glm::vec3 origin{0, 0, 0};
 float fov = 45.0f;
 float radius = 5.0f;
@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  fstream file{argv[1], ios::in};
+  fstream file{argv[1], ios::in | ios::binary};
   // Ignore header.
   file.ignore(80);
   uint32_t stl_size;
@@ -169,8 +169,8 @@ int main(int argc, char* argv[]) {
     glViewport(0, 0, width, height);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glm::vec3 camera{cos(altitude) * cos(azimuth), sin(altitude),
-                     cos(altitude) * sin(azimuth)};
+    glm::vec3 camera{cos(altitude) * cos(azimuth), cos(altitude) * sin(azimuth),
+                     sin(altitude)};
     camera *= radius;
     const auto v = glm::lookAt(camera + origin, origin, up);
     const auto camera_right = normalize(cross(-camera, up));
@@ -186,7 +186,7 @@ int main(int argc, char* argv[]) {
     int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
     if (state == GLFW_PRESS) {
       altitude += mouse_move.y * 0.01;
-      azimuth += mouse_move.x * 0.01;
+      azimuth -= mouse_move.x * 0.01;
       constexpr float bound = M_PI_2 - 1e-5f;
       // if (altitude >= bound) altitude = bound;
       // if (altitude <= -bound) altitude = -bound;
@@ -203,7 +203,7 @@ int main(int argc, char* argv[]) {
     // m = rotate(m, (float)glfwGetTime(),
     //            glm::vec3(1 / sqrt(3), 1 / sqrt(3), 1 / sqrt(3)));
     // glm::mat4 v = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5));
-    glm::mat4 p = glm::perspective(fov, ratio, 0.1f, 100.f);
+    glm::mat4 p = glm::perspective(fov, ratio, 0.1f, 10000.f);
     glm::mat4 mvp = p * v * m;
 
     glUseProgram(program);
