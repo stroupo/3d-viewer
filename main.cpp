@@ -35,21 +35,34 @@ static const char* vertex_shader_text =
     "attribute vec3 vNor;"
     // "varying vec3 color;"
     "varying vec3 normal;"
+    "out vec3 frag_pos;"
     "void main()"
     "{"
     "  gl_Position = MVP * vec4(vPos, 1.0);"
+    "  frag_pos = vPos;"
     // "  color = vCol;"
     "  normal = vNor;"
     "}";
 
 static const char* fragment_shader_text =
     "#version 330\n"
+    "uniform vec3 light_pos;"
     // "varying vec3 color;"
     "varying vec3 normal;"
+    "in vec3 frag_pos;"
     "void main()"
     "{"
     // "  gl_FragColor = vec4(color, 1.0);"
-    "  gl_FragColor = vec4(normal, 1.0);"
+    // "  gl_FragColor = vec4(normal, 1.0);"
+    "  vec3 norm = normalize(normal);"
+    "  vec3 light_dir = normalize(light_pos - frag_pos);"
+    "  float diffuse = max(dot(norm, light_dir), 0.0);"
+    "  vec3 diffuse_color = diffuse * vec3(1.0, 1.0, 1.0);"
+    "  vec3 ambient_color = vec3(1.0, 1.0, 1.0);"
+    "  float ambient_coeff = 0.5;"
+    "  float diffuse_coeff = 0.5;"
+    "  gl_FragColor = diffuse_coeff * vec4(diffuse_color, 1.0) + ambient_coeff "
+    "* vec4(ambient_color, 1.0);"
     "}";
 
 glm::vec3 up{0, 0, 1};
@@ -138,6 +151,7 @@ int main(int argc, char* argv[]) {
   glLinkProgram(program);
 
   auto mvp_location = glGetUniformLocation(program, "MVP");
+  auto light_pos_location = glGetUniformLocation(program, "light_pos");
   auto vpos_location = glGetAttribLocation(program, "vPos");
   auto vnor_location = glGetAttribLocation(program, "vNor");
 
@@ -208,6 +222,7 @@ int main(int argc, char* argv[]) {
 
     glUseProgram(program);
     glUniformMatrix4fv(mvp_location, 1, GL_FALSE, glm::value_ptr(mvp));
+    glUniform3fv(light_pos_location, 1, glm::value_ptr(camera + origin));
     // glDrawArrays(GL_TRIANGLES, 0, 3);
     glDrawArrays(GL_TRIANGLES, 0, triangles.size() / 2);
 
